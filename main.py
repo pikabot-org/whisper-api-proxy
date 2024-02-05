@@ -1,54 +1,50 @@
 from io import BytesIO
 import httpx
-from rich.console import Console
-from starlette.applications import Starlette
 from starlette.config import Config
 from starlette.datastructures import Secret
-from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse
-from starlette.routing import Route
+from starlette.responses import JSONResponse
+from fastapi import FastAPI, Request, HTTPException
+from os import environ
 
-config = Config(".env")
-console = Console()
+config = Config(environ=environ)
 
 HOST: str = config("HOST", cast=str, default="0.0.0.0")
 PORT: int = config("PORT", cast=int, default=8000)
 DEBUG: bool = config("DEBUG", cast=bool, default=False)
 OPENAI_API_KEY = Secret = config("OPENAI_API_KEY", cast=Secret)
 
+app = FastAPI(debug=DEBUG)
 
-async def transcribe(data: bytes) -> str:
-    file = ("audio.mp4", BytesIO(data), "audio/mp4")
 
-    async with httpx.AsyncClient() as client:
+async def send_request(mode: str, data: bytes) -> dict:
+    content = data.split(b"\r\n\r\n")[-1]
+
+    file = ("audio.m4a", BytesIO(content), "audio/m4a")
+
+    print(f"Making request with {data[:500]=}")
+
+    async with httpx.AsyncClient(timeout=3600) as client:
         r = await client.post(
-            "https://api.openai.com/v1/audio/transcriptions",
+            f"https://api.openai.com/v1/audio/{mode}",
             files={"file": file},
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
             data={"model": "whisper-1", "response_format": "verbose_json"},
         )
-    transcript = r.json()
-    return transcript
+
+    print(f"OpenAI response: {r.text[:500]=}")
+
+    return r.json()
 
 
-async def handle_index(request: Request) -> JSONResponse:
-    rv = {"hello": "world"}
-    return JSONResponse(rv)
+@app.get("/")
+async def handle_index(request: Request):
+    return JSONResponse({"hello": "world"})
 
 
-async def handle_transcribe(request: Request) -> PlainTextResponse:
-    upload: bytes = await request.body()
-    console.log(f"Received {len(upload)} bytes")
-
-    transcription = await transcribe(upload)
-    console.log(f'Transcription: "{transcription}"')
-
+@app.post("/{mode}")
+async def handle_whisper(request: Request, mode: str):
+    if mode not in ["transcriptions", "translations"]:
+        raise HTTPException(status_code=400, detail="Invalid mode. Use 'transcriptions' or 'translations'.")
+    request_file: bytes = await request.body()
+    transcription = await send_request(mode, request_file)
     return JSONResponse(transcription)
-
-
-routes = [
-    Route("/", handle_index),
-    Route("/v1/audio/transcriptions", handle_transcribe, methods=["POST"]),
-]
-
-app = Starlette(routes=routes, debug=DEBUG)
