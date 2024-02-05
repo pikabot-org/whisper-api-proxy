@@ -1,17 +1,19 @@
 # Use the official Python image as the base image
-FROM python:3.10-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
 # Set the working directory inside the container
 WORKDIR /app
 
+# Install dependencies
+# We first install pipenv and then use it to install the rest of the dependencies
+RUN pip install --upgrade pip
+RUN pip install pipenv
+
 # Copy the Pipenv files into the container
 COPY Pipfile Pipfile.lock ./
 
-# Install dependencies
-# We first install pipenv and then use it to install the rest of the dependencies
-RUN pip install --upgrade pip && \
-    pip install pipenv && \
-    pipenv install --system --deploy
+# Install python packages
+RUN pipenv install --system --deploy
 
 # Copy the rest of your application's code
 COPY . .

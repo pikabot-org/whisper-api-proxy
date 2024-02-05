@@ -4,10 +4,9 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-starlette = {extras = ["full"], version = "*"}
 uvicorn = {extras = ["standard"], version = "*"}
 httpx = "*"
-rich = "*"
+fastapi = "*"
 
 [dev-packages]
 ptpython = "*"
@@ -15,7 +14,7 @@ mypy = "*"
 black = "*"
 
 [requires]
-python_version = "3.10"
+python_version = "3.11"
 
 [scripts]
 serve = "uvicorn main:app --host 0.0.0.0"
