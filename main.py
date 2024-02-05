@@ -18,17 +18,17 @@ OPENAI_API_KEY = Secret = config("OPENAI_API_KEY", cast=Secret)
 
 
 async def transcribe(data: bytes) -> str:
-    file = ("audio.m4a", BytesIO(data), "audio/m4a")
+    file = ("audio.mp4", BytesIO(data), "audio/mp4")
 
     async with httpx.AsyncClient() as client:
         r = await client.post(
             "https://api.openai.com/v1/audio/transcriptions",
             files={"file": file},
             headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            data={"model": "whisper-1"},
+            data={"model": "whisper-1", "response_format": "verbose_json"},
         )
     transcript = r.json()
-    return transcript["text"]
+    return transcript
 
 
 async def handle_index(request: Request) -> JSONResponse:
@@ -43,12 +43,12 @@ async def handle_transcribe(request: Request) -> PlainTextResponse:
     transcription = await transcribe(upload)
     console.log(f'Transcription: "{transcription}"')
 
-    return PlainTextResponse(transcription)
+    return JSONResponse(transcription)
 
 
 routes = [
     Route("/", handle_index),
-    Route("/transcribe", handle_transcribe, methods=["POST"]),
+    Route("/v1/audio/transcriptions", handle_transcribe, methods=["POST"]),
 ]
 
 app = Starlette(routes=routes, debug=DEBUG)
